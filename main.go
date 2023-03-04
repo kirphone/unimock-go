@@ -33,10 +33,10 @@ func main() {
 	triggerService := triggers.NewService(sqlDB)
 	triggerHandler := triggers.NewHandler(triggerService)
 
-	control := app.Group("/TStub/control")
-	triggersController := control.Group("/triggers")
-	triggersController.Get("/get", triggerHandler.GetTriggers)
-	triggersController.Post("/add", triggerHandler.AddTrigger)
+	api := app.Group("/api")
+	triggersController := api.Group("/triggers")
+	triggersController.Get("", triggerHandler.GetTriggers)
+	triggersController.Post("", triggerHandler.AddTrigger)
 
 	app.Listen(":8080")
 }

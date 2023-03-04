@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
+	"unimock/util"
 )
 
 type TriggerHandler struct {
@@ -31,7 +32,8 @@ func (handler *TriggerHandler) AddTrigger(context *fiber.Ctx) error {
 	if err := handler.triggerService.addTrigger(trigger); err != nil {
 		zap.L().Error(err.Error())
 		if _, ok := err.(*TriggerValidationException); ok {
-			return context.Status(fiber.StatusBadRequest).SendString(err.Error())
+			resp := util.NewExceptionResponse(err.Error())
+			return context.Status(fiber.StatusBadRequest).JSON(resp)
 		}
 		return err
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const INSERT_QUERY = "INSERT INTO Triggers (type, expression, headers, comment, active) VALUES (?,?,?,?,?)"
+const InsertQuery = "INSERT INTO Triggers (type, expression, headers, comment, active) VALUES (?,?,?,?,?)"
 
 type Trigger struct {
 	Id          int64
@@ -53,9 +53,9 @@ func (service *TriggerService) getTriggers() []*Trigger {
 
 func (service *TriggerService) addTrigger(trigger *Trigger) error {
 	if !trigger.validate() {
-		return &TriggerValidationException{message: "не указан тип триггера"}
+		return &TriggerValidationException{message: "Не указан тип триггера"}
 	}
-	insertStatement, err := service.db.Prepare(INSERT_QUERY)
+	insertStatement, err := service.db.Prepare(InsertQuery)
 	if err != nil {
 		return err
 	}
