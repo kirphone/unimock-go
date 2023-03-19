@@ -3,20 +3,23 @@ package triggers
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strings"
+	"unimock/util"
 )
 
-const InsertQuery = "INSERT INTO Triggers (type, expression, description, active, headers) VALUES (?,?,?,?,?,?)"
-const UpdateQuery = "UPDATE Triggers SET type = ?, expression = ?, description = ?, active = ?, headers = ? where id = ?"
-const SelectAllQuery = "SELECT * FROM Triggers"
+const InsertQuery = "INSERT INTO triggers (type, expression, description, active, headers) VALUES (?,?,?,?,?,?)"
+const UpdateQuery = "UPDATE triggers SET type = ?, expression = ?, description = ?, active = ?, headers = ? where id = ?"
+const SelectAllQuery = "SELECT * FROM triggers"
 
 type Trigger struct {
-	Id          int64
-	TriggerType string
-	Expression  string
-	Description string
-	IsActive    bool
-	Headers     map[string]string
+	Id               int64
+	TriggerType      string
+	Expression       string
+	Description      string
+	IsActive         bool
+	Headers          map[string]string
+	expressionRegexp *regexp.Regexp
 }
 
 func (trigger *Trigger) validate() bool {
@@ -147,8 +150,33 @@ func (service *TriggerService) UpdateFromDb() error {
 		}
 
 		t.Headers = getHeadersFromString(headersRow)
+		t.expressionRegexp, err = regexp.Compile(t.Expression)
+		if err != nil {
+			return err
+		}
 
 		service.triggers[t.Id] = &t
 	}
 	return nil
+}
+
+func (service *TriggerService) ProcessMessage(message *util.Message) *util.Message {
+	for _, trigger := range service.triggers {
+		if trigger.IsActive &&
+			containHeaders(message.Headers, trigger.Headers) &&
+			trigger.expressionRegexp.MatchString(message.Body) {
+			return nil
+		}
+	}
+	return nil
+}
+
+func containHeaders(messageHeaders map[string]string, triggerHeaders map[string]string) bool {
+	for key, valueTrigger := range triggerHeaders {
+		valueMessage, ok := messageHeaders[key]
+		if !ok || valueMessage != valueTrigger {
+			return false
+		}
+	}
+	return true
 }

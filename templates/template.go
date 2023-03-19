@@ -6,8 +6,8 @@ import (
 	"unimock/util"
 )
 
-const InsertQuery = "INSERT INTO Templates (id, name, body) VALUES (?,?,?)"
-const SelectAllQuery = "SELECT * FROM Templates"
+const InsertQuery = "INSERT INTO templates (id, name, body) VALUES (?,?,?)"
+const SelectAllQuery = "SELECT * FROM templates"
 
 type Template struct {
 	Id   int64
