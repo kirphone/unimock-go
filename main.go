@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -29,6 +30,7 @@ func main() {
 	loggingLevel := viper.GetString("logging.level")
 	logFile := viper.GetString("logging.file")
 	dbFile := viper.GetString("db.file")
+	embeddedMonitor := viper.GetBool("monitoring.embedded")
 	level, err := zerolog.ParseLevel(loggingLevel)
 	if err != nil {
 		level = zerolog.InfoLevel
@@ -107,6 +109,10 @@ func main() {
 
 	api.All("/http/process", triggerHandler.ProcessMessage)
 
+	if embeddedMonitor {
+		app.Get("/monitor", monitor.New(monitor.Config{Title: "Unimock Metrics Page"}))
+	}
+
 	err = app.Listen(":" + strconv.Itoa(serverPort))
 	if err != nil {
 		log.Error().Err(err).Msg("")
@@ -118,6 +124,10 @@ func Middleware() fiber.Handler {
 		start := time.Now()
 
 		err := c.Next()
+
+		if c.Path() == "/monitor" {
+			return err
+		}
 
 		if err != nil {
 			err = errorhandlers.HandleError(c, err)

@@ -43,6 +43,9 @@ func HandleError(context *fiber.Ctx, err error) error {
 		return HandleErrorStatus(context, fiber.StatusBadRequest, err)
 	case *sqlite.Error:
 		return HandleSqlError(context, v)
+	case *fiber.Error:
+		log.Error().Err(err).Msg("")
+		return err
 	default:
 		context.Status(fiber.StatusInternalServerError)
 		errType := reflect.TypeOf(err).String()

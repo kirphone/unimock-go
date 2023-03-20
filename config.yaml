@@ -5,3 +5,5 @@ logging:
   file: server.log
 db:
   file: database/unimock.db
+monitoring:
+   embedded: true
