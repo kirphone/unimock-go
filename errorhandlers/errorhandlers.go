@@ -2,13 +2,13 @@ package errorhandlers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog/log"
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 	"reflect"
-	"strconv"
 	"unimock/templates"
 	"unimock/triggers"
+	"unimock/util"
 )
 
 type ExceptionResponse struct {
@@ -23,37 +23,45 @@ func (response *ExceptionResponse) setMessage(message string) {
 	response.Message = message
 }
 
-type ErrorHandler struct{}
-
-func (errorHandler *ErrorHandler) HandleErrorStatus(context *fiber.Ctx, status int, err error) error {
-	zap.L().Error(err.Error())
+func HandleErrorStatus(context *fiber.Ctx, status int, err error) error {
+	log.Error().Err(err).Msg("")
 	resp := NewExceptionResponse(err.Error())
 	return context.Status(status).JSON(resp)
 }
 
-func (errorHandler *ErrorHandler) HandleError(context *fiber.Ctx, err error) error {
-	if _, ok := err.(*templates.TemplateValidationException); ok {
-		return errorHandler.HandleErrorStatus(context, fiber.StatusBadRequest, err)
-	} else if _, ok := err.(*templates.TemplateNotFoundException); ok {
-		return errorHandler.HandleErrorStatus(context, fiber.StatusNotFound, err)
-	} else if _, ok := err.(*triggers.TriggerValidationException); ok {
-		return errorHandler.HandleErrorStatus(context, fiber.StatusBadRequest, err)
-	} else if _, ok := err.(*triggers.TriggerNotFoundException); ok {
-		return errorHandler.HandleErrorStatus(context, fiber.StatusNotFound, err)
-	} else if err2, ok := err.(*sqlite.Error); ok {
-		return errorHandler.HandleSqlError(context, err2)
-	} else {
+func HandleError(context *fiber.Ctx, err error) error {
+	switch v := err.(type) {
+	case *templates.TemplateValidationException:
+		return HandleErrorStatus(context, fiber.StatusBadRequest, err)
+	case *templates.TemplateNotFoundException:
+		return HandleErrorStatus(context, fiber.StatusNotFound, err)
+	case *triggers.TriggerValidationException:
+		return HandleErrorStatus(context, fiber.StatusBadRequest, err)
+	case *triggers.TriggerNotFoundException:
+		return HandleErrorStatus(context, fiber.StatusNotFound, err)
+	case *util.ParamValidationException:
+		return HandleErrorStatus(context, fiber.StatusBadRequest, err)
+	case *sqlite.Error:
+		return HandleSqlError(context, v)
+	default:
+		context.Status(fiber.StatusInternalServerError)
 		errType := reflect.TypeOf(err).String()
-		zap.L().Error(errType + ": " + err.Error())
+		log.Error().Err(err).Msgf("Unknown error: %s", errType)
 		return err
 	}
 }
 
-func (errorHandler *ErrorHandler) HandleSqlError(context *fiber.Ctx, err *sqlite.Error) error {
-	if err.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE {
-		return errorHandler.HandleErrorStatus(context, fiber.StatusConflict, err)
+func HandleSqlError(context *fiber.Ctx, err *sqlite.Error) error {
+	if err.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE || err.Code() == sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY {
+		return HandleErrorStatus(context, fiber.StatusConflict, err)
 	} else {
-		zap.L().Error("Unknown error code: " + strconv.Itoa(err.Code()) + " " + sqlite.ErrorCodeString[err.Code()] + ": " + err.Error())
+		log.Error().Err(err).Msgf("Unknown error code: %d %s", err.Code(), sqlite.ErrorCodeString[err.Code()])
+		context.Status(fiber.StatusInternalServerError)
 		return err
 	}
+}
+
+func FinalErrorHandler(context *fiber.Ctx, err error) error {
+	resp := NewExceptionResponse(err.Error())
+	return context.JSON(resp)
 }

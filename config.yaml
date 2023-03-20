@@ -1,0 +1,7 @@
+server:
+  port: 8080
+logging:
+  level: debug
+  file: server.log
+db:
+  file: database/unimock.db

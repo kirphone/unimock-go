@@ -3,61 +3,54 @@ package templates
 import (
 	"encoding/json"
 	"github.com/gofiber/fiber/v2"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog/log"
 	"strconv"
 	"unimock/util"
 )
 
 type TemplateHandler struct {
 	templateService *TemplateService
-	errorHandler    util.ErrorHandler
 }
 
-func NewHandler(service *TemplateService, errorHandler util.ErrorHandler) *TemplateHandler {
+func NewHandler(service *TemplateService) *TemplateHandler {
 	return &TemplateHandler{
 		templateService: service,
-		errorHandler:    errorHandler,
 	}
 }
 
 func (handler *TemplateHandler) GetTemplates(context *fiber.Ctx) error {
-	zap.L().Info("Получен запрос на вывод всех шаблонов")
 	return context.JSON(handler.templateService.GetTemplates())
 }
 
 func (handler *TemplateHandler) GetTemplateById(context *fiber.Ctx) error {
-	zap.L().Info("Получен запрос на вывод шаблона с id = " + context.Params("id"))
 	id, err := strconv.ParseInt(context.Params("id"), 10, 64)
 	if err != nil {
-		return handler.errorHandler.HandleErrorStatus(context, fiber.StatusBadRequest, err)
+		return util.CreateParamValidationException("id", err)
 	}
 
 	template, err := handler.templateService.GetTemplateById(id)
 	if err != nil {
-		return handler.errorHandler.HandleError(context, err)
+		return err
 	}
 
 	return context.JSON(template)
 }
 
 func (handler *TemplateHandler) AddTemplate(context *fiber.Ctx) error {
-	zap.L().Info("Получен запрос на добавление триггера")
 	template := new(Template)
 	if err := json.Unmarshal(context.Body(), template); err != nil {
-		return handler.errorHandler.HandleErrorStatus(context, fiber.StatusBadRequest, err)
+		return &TemplateValidationException{message: err.Error()}
 	}
 	if err := handler.templateService.AddTemplate(template); err != nil {
-		return handler.errorHandler.HandleError(context, err)
+		return err
 	}
 	return nil
 }
 
 func (handler *TemplateHandler) ProcessSpecificTemplate(context *fiber.Ctx) error {
-	zap.L().Info("Получен запрос на обработку сообщения по шаблону")
-
 	templateId, err := strconv.ParseInt(context.Params("id"), 10, 64)
 	if err != nil {
-		return handler.errorHandler.HandleErrorStatus(context, fiber.StatusBadRequest, err)
+		return util.CreateParamValidationException("id", err)
 	}
 
 	inputMessage := util.Message{
@@ -65,9 +58,11 @@ func (handler *TemplateHandler) ProcessSpecificTemplate(context *fiber.Ctx) erro
 		Headers: context.GetReqHeaders(),
 	}
 
+	log.Debug().Any("headers", inputMessage.Headers).Str("body", inputMessage.Body).Msg("Получено сообщение")
+
 	outputMessage, err := handler.templateService.ProcessMessage(templateId, &inputMessage)
 	if err != nil {
-		return handler.errorHandler.HandleError(context, err)
+		return err
 	}
 
 	for key, value := range outputMessage.Headers {

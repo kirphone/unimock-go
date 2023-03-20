@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unimock/scenarios"
 	"unimock/util"
 )
 
@@ -27,14 +28,16 @@ func (trigger *Trigger) validate() bool {
 }
 
 type TriggerService struct {
-	triggers map[int64]*Trigger
-	db       *sql.DB
+	triggers        map[int64]*Trigger
+	db              *sql.DB
+	scenarioService *scenarios.ScenarioService
 }
 
-func NewService(db *sql.DB) *TriggerService {
+func NewService(db *sql.DB, scenarioService *scenarios.ScenarioService) *TriggerService {
 	return &TriggerService{
-		triggers: make(map[int64]*Trigger),
-		db:       db,
+		triggers:        make(map[int64]*Trigger),
+		db:              db,
+		scenarioService: scenarioService,
 	}
 }
 
@@ -160,15 +163,17 @@ func (service *TriggerService) UpdateFromDb() error {
 	return nil
 }
 
-func (service *TriggerService) ProcessMessage(message *util.Message) *util.Message {
+func (service *TriggerService) ProcessMessage(message *util.Message) (*util.Message, error) {
 	for _, trigger := range service.triggers {
 		if trigger.IsActive &&
 			containHeaders(message.Headers, trigger.Headers) &&
 			trigger.expressionRegexp.MatchString(message.Body) {
-			return nil
+			return service.scenarioService.ProcessMessage(message, trigger.Id)
 		}
 	}
-	return nil
+	return nil, &TriggerNotFoundException{
+		message: "Триггер для сообщения не найден",
+	}
 }
 
 func containHeaders(messageHeaders map[string]string, triggerHeaders map[string]string) bool {

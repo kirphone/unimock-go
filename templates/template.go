@@ -55,7 +55,7 @@ func (service *TemplateService) GetTemplateById(id int64) (*Template, error) {
 
 func (service *TemplateService) AddTemplate(template *Template) error {
 	if !template.validate() {
-		return &TemplateValidationException{message: "Не указан тип триггера"}
+		return &TemplateValidationException{message: "Не указано имя шаблона"}
 	}
 	insertStatement, err := service.db.Prepare(InsertQuery)
 	if err != nil {

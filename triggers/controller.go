@@ -3,68 +3,82 @@ package triggers
 import (
 	"encoding/json"
 	"github.com/gofiber/fiber/v2"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog/log"
 	"strconv"
 	"unimock/util"
 )
 
 type TriggerHandler struct {
 	triggerService *TriggerService
-	errorHandler   util.ErrorHandler
 }
 
-func NewHandler(service *TriggerService, errorHandler util.ErrorHandler) *TriggerHandler {
+func NewHandler(service *TriggerService) *TriggerHandler {
 	return &TriggerHandler{
 		triggerService: service,
-		errorHandler:   errorHandler,
 	}
 }
 
 func (handler *TriggerHandler) GetTriggers(context *fiber.Ctx) error {
-	zap.L().Info("Получен запрос на вывод всех триггеров")
 	return context.JSON(handler.triggerService.GetTriggers())
 }
 
 func (handler *TriggerHandler) GetTriggerById(context *fiber.Ctx) error {
-	zap.L().Info("Получен запрос на вывод триггера с id = " + context.Params("id"))
 	id, err := strconv.ParseInt(context.Params("id"), 10, 64)
 	if err != nil {
-		return handler.errorHandler.HandleErrorStatus(context, fiber.StatusBadRequest, err)
+		return util.CreateParamValidationException("id", err)
 	}
 
 	trigger, err := handler.triggerService.GetTriggerById(id)
 	if err != nil {
-		return handler.errorHandler.HandleError(context, err)
+		return err
 	}
 
 	return context.JSON(trigger)
 }
 
 func (handler *TriggerHandler) AddTrigger(context *fiber.Ctx) error {
-	zap.L().Info("Получен запрос на добавление триггера")
 	trigger := new(Trigger)
 	if err := json.Unmarshal(context.Body(), trigger); err != nil {
-		return handler.errorHandler.HandleErrorStatus(context, fiber.StatusBadRequest, err)
+		return &TriggerValidationException{message: err.Error()}
 	}
 	if err := handler.triggerService.AddTrigger(trigger); err != nil {
-		return handler.errorHandler.HandleError(context, err)
+		return err
 	}
 	return nil
 }
 
 func (handler *TriggerHandler) UpdateTrigger(context *fiber.Ctx) error {
-	zap.L().Info("Получен запрос на обновление триггера с id = " + context.Params("id"))
 	trigger := new(Trigger)
 	if err := json.Unmarshal(context.Body(), trigger); err != nil {
-		return handler.errorHandler.HandleErrorStatus(context, fiber.StatusBadRequest, err)
+		return &TriggerValidationException{message: err.Error()}
 	}
 	id, err := strconv.ParseInt(context.Params("id"), 10, 64)
 	if err != nil {
-		return handler.errorHandler.HandleErrorStatus(context, fiber.StatusBadRequest, err)
+		return util.CreateParamValidationException("id", err)
 	}
 	trigger.Id = id
 	if err := handler.triggerService.UpdateTrigger(trigger); err != nil {
-		return handler.errorHandler.HandleError(context, err)
+		return err
 	}
 	return nil
+}
+
+func (handler *TriggerHandler) ProcessMessage(context *fiber.Ctx) error {
+	inputMessage := util.Message{
+		Body:    string(context.Body()),
+		Headers: context.GetReqHeaders(),
+	}
+
+	log.Debug().Any("headers", inputMessage.Headers).Str("body", inputMessage.Body).Msg("Получено сообщение")
+
+	outputMessage, err := handler.triggerService.ProcessMessage(&inputMessage)
+	if err != nil {
+		return err
+	}
+
+	for key, value := range outputMessage.Headers {
+		context.Append(key, value)
+	}
+
+	return context.SendString(outputMessage.Body)
 }
