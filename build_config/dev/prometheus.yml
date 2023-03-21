@@ -27,3 +27,11 @@ scrape_configs:
 
     static_configs:
       - targets: ["localhost:9090"]
+  - job_name: "unimock"
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+    metrics_path: "/metrics"
+
+    static_configs:
+      - targets: [ "host.docker.internal:8080" ]

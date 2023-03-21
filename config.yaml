@@ -7,3 +7,4 @@ db:
   file: database/unimock.db
 monitoring:
    embedded: true
+   prometheus: true

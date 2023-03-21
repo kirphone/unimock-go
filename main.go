@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/monitor"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"os"
 	"strconv"
@@ -31,6 +33,7 @@ func main() {
 	logFile := viper.GetString("logging.file")
 	dbFile := viper.GetString("db.file")
 	embeddedMonitor := viper.GetBool("monitoring.embedded")
+	prometheusMonitor := viper.GetBool("monitoring.prometheus")
 	level, err := zerolog.ParseLevel(loggingLevel)
 	if err != nil {
 		level = zerolog.InfoLevel
@@ -112,6 +115,14 @@ func main() {
 
 	api.All("/http/process*", triggerHandler.ProcessMessage)
 
+	if prometheusMonitor {
+		app.Get("/metrics", func(c *fiber.Ctx) error {
+			handler := fasthttpadaptor.NewFastHTTPHandler(promhttp.Handler())
+			handler(c.Context())
+			return nil
+		})
+	}
+
 	if embeddedMonitor {
 		app.Get("/monitor", monitor.New(monitor.Config{Title: "Unimock Metrics Page"}))
 	}
@@ -128,7 +139,7 @@ func Middleware() fiber.Handler {
 
 		err := c.Next()
 
-		if c.Path() == "/monitor" {
+		if c.Path() == "/monitor" || c.Path() == "/metrics" || c.Path() == "/favicon.ico" {
 			return err
 		}
 
