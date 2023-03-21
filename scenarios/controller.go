@@ -1,6 +1,7 @@
 package scenarios
 
 import (
+	"encoding/json"
 	"github.com/gofiber/fiber/v2"
 	"strconv"
 	"unimock/util"
@@ -23,6 +24,32 @@ func (handler *ScenarioHandler) GetOrderedStepsByTriggerId(context *fiber.Ctx) e
 	}
 
 	steps := handler.scenarioService.GetOrderedStepsByTriggerId(triggerId)
-
 	return context.JSON(steps)
+}
+
+func (handler *ScenarioHandler) AddStep(context *fiber.Ctx) error {
+	step := new(ScenarioStep)
+	if err := json.Unmarshal(context.Body(), step); err != nil {
+		return &StepValidationException{message: err.Error()}
+	}
+	if err := handler.scenarioService.AddStep(step); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (handler *ScenarioHandler) UpdateStep(context *fiber.Ctx) error {
+	step := new(ScenarioStep)
+	if err := json.Unmarshal(context.Body(), step); err != nil {
+		return &StepValidationException{message: err.Error()}
+	}
+	id, err := strconv.ParseInt(context.Params("id"), 10, 64)
+	if err != nil {
+		return util.CreateParamValidationException("id", err)
+	}
+	step.Id = id
+	if err := handler.scenarioService.UpdateStep(step); err != nil {
+		return err
+	}
+	return nil
 }

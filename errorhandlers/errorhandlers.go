@@ -6,6 +6,7 @@ import (
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 	"reflect"
+	"unimock/scenarios"
 	"unimock/templates"
 	"unimock/triggers"
 	"unimock/util"
@@ -39,6 +40,8 @@ func HandleError(context *fiber.Ctx, err error) error {
 		return HandleErrorStatus(context, fiber.StatusBadRequest, err)
 	case *triggers.TriggerNotFoundException:
 		return HandleErrorStatus(context, fiber.StatusNotFound, err)
+	case *scenarios.StepValidationException:
+		return HandleErrorStatus(context, fiber.StatusBadRequest, err)
 	case *util.ParamValidationException:
 		return HandleErrorStatus(context, fiber.StatusBadRequest, err)
 	case *sqlite.Error:

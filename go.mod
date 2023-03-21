@@ -6,12 +6,14 @@ require (
 	github.com/gofiber/fiber/v2 v2.42.0
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/viper v1.15.0
+	github.com/stretchr/testify v1.8.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	modernc.org/sqlite v1.21.0
 )
 
 require (
 	github.com/andybalholm/brotli v1.0.4 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
@@ -25,6 +27,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/philhofer/fwd v1.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/savsgio/dictpool v0.0.0-20221023140959-7bf2e61cea94 // indirect

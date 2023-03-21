@@ -3,6 +3,7 @@ package triggers
 import (
 	"database/sql"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"regexp"
 	"strings"
 	"unimock/scenarios"
@@ -108,6 +109,7 @@ func (service *TriggerService) UpdateTrigger(trigger *Trigger) error {
 		return err
 	}
 
+	trigger.expressionRegexp, err = regexp.Compile(trigger.Expression)
 	service.triggers[trigger.Id] = trigger
 	return nil
 }
@@ -168,6 +170,7 @@ func (service *TriggerService) ProcessMessage(message *util.Message) (*util.Mess
 		if trigger.IsActive &&
 			containHeaders(message.Headers, trigger.Headers) &&
 			trigger.expressionRegexp.MatchString(message.Body) {
+			log.Debug().Int64("triggerId", trigger.Id).Msg("Выбран триггер")
 			return service.scenarioService.ProcessMessage(message, trigger.Id)
 		}
 	}

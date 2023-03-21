@@ -102,12 +102,15 @@ func main() {
 	templateController.Get("", templateHandler.GetTemplates)
 	templateController.Post("", templateHandler.AddTemplate)
 	templateController.Get("/:id", templateHandler.GetTemplateById)
-	templateController.All("/:id/process", templateHandler.ProcessSpecificTemplate)
+	templateController.All("/:id/process*", templateHandler.ProcessSpecificTemplate)
+	templateController.Put("/:id", templateHandler.UpdateTemplate)
 
 	scenarioController := api.Group("/steps")
-	scenarioController.Get("/field/templateId/:templateId", scenarioHandler.GetOrderedStepsByTriggerId)
+	scenarioController.Get("/field/triggerId/:triggerId", scenarioHandler.GetOrderedStepsByTriggerId)
+	scenarioController.Post("", scenarioHandler.AddStep)
+	scenarioController.Put("/:id", scenarioHandler.UpdateStep)
 
-	api.All("/http/process", triggerHandler.ProcessMessage)
+	api.All("/http/process*", triggerHandler.ProcessMessage)
 
 	if embeddedMonitor {
 		app.Get("/monitor", monitor.New(monitor.Config{Title: "Unimock Metrics Page"}))

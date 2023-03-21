@@ -6,8 +6,9 @@ import (
 	"unimock/util"
 )
 
-const InsertQuery = "INSERT INTO templates (id, name, body) VALUES (?,?,?)"
+const InsertQuery = "INSERT INTO templates (name, body) VALUES (?,?)"
 const SelectAllQuery = "SELECT * FROM templates"
+const UpdateQuery = "UPDATE templates SET name = ?, body = ? where id = ?"
 
 type Template struct {
 	Id   int64
@@ -61,7 +62,7 @@ func (service *TemplateService) AddTemplate(template *Template) error {
 	if err != nil {
 		return err
 	}
-	res, err := insertStatement.Exec(template.Id, template.Name, template.Body)
+	res, err := insertStatement.Exec(template.Name, template.Body)
 	if err != nil {
 		return err
 	}
@@ -72,6 +73,28 @@ func (service *TemplateService) AddTemplate(template *Template) error {
 	}
 
 	err = insertStatement.Close()
+	if err != nil {
+		return err
+	}
+
+	service.templates[template.Id] = template
+	return nil
+}
+
+func (service *TemplateService) UpdateTemplate(template *Template) error {
+	if !template.validate() {
+		return &TemplateValidationException{message: "Не указано имя шаблона"}
+	}
+	updateStatement, err := service.db.Prepare(UpdateQuery)
+	if err != nil {
+		return err
+	}
+	_, err = updateStatement.Exec(template.Name, template.Body, template.Id)
+	if err != nil {
+		return err
+	}
+
+	err = updateStatement.Close()
 	if err != nil {
 		return err
 	}

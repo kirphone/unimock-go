@@ -47,6 +47,22 @@ func (handler *TemplateHandler) AddTemplate(context *fiber.Ctx) error {
 	return nil
 }
 
+func (handler *TemplateHandler) UpdateTemplate(context *fiber.Ctx) error {
+	template := new(Template)
+	if err := json.Unmarshal(context.Body(), template); err != nil {
+		return &TemplateValidationException{message: err.Error()}
+	}
+	id, err := strconv.ParseInt(context.Params("id"), 10, 64)
+	if err != nil {
+		return util.CreateParamValidationException("id", err)
+	}
+	template.Id = id
+	if err := handler.templateService.UpdateTemplate(template); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (handler *TemplateHandler) ProcessSpecificTemplate(context *fiber.Ctx) error {
 	templateId, err := strconv.ParseInt(context.Params("id"), 10, 64)
 	if err != nil {
