@@ -115,11 +115,11 @@ func (service *ScenarioService) UpdateFromDb() error {
 }
 
 func (service *ScenarioService) GetOrderedStepsByTriggerId(triggerId int64) Steps {
-	steps := service.steps[triggerId]
-	sort.Sort(steps)
-	if steps == nil {
-		steps = Steps{}
+	steps, ok := service.steps[triggerId]
+	if !ok {
+		return Steps{}
 	}
+	sort.Sort(steps)
 	return steps
 }
 

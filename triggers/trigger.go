@@ -4,19 +4,31 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/rs/zerolog/log"
+	"github.com/tidwall/gjson"
 	"regexp"
 	"strings"
 	"unimock/scenarios"
 	"unimock/util"
 )
 
-const InsertQuery = "INSERT INTO triggers (type, expression, description, active, headers) VALUES (?,?,?,?,?,?)"
+const InsertQuery = "INSERT INTO triggers (type, expression, description, active, headers) VALUES (?,?,?,?,?)"
 const UpdateQuery = "UPDATE triggers SET type = ?, expression = ?, description = ?, active = ?, headers = ? where id = ?"
 const SelectAllQuery = "SELECT * FROM triggers"
 
+type TriggerType string
+
+const (
+	Json  TriggerType = "json"
+	Regex             = "regex"
+)
+
+const contentType = "Content-Type"
+const contentTypeJSONValue = "application/json"
+const dotAllRegexMod = "(?s)"
+
 type Trigger struct {
 	Id               int64
-	TriggerType      string
+	TriggerType      TriggerType
 	Expression       string
 	Description      string
 	IsActive         bool
@@ -53,9 +65,9 @@ func (service *TriggerService) GetTriggers() []*Trigger {
 }
 
 func (service *TriggerService) GetTriggerById(id int64) (*Trigger, error) {
-	trigger := service.triggers[id]
+	trigger, ok := service.triggers[id]
 
-	if trigger == nil {
+	if !ok {
 		return nil, &TriggerNotFoundException{
 			message: fmt.Sprintf("Триггер с id = %d не найден", id),
 		}
@@ -87,6 +99,11 @@ func (service *TriggerService) AddTrigger(trigger *Trigger) error {
 		return err
 	}
 
+	err = trigger.prepare()
+	if err != nil {
+		return err
+	}
+
 	service.triggers[trigger.Id] = trigger
 	return nil
 }
@@ -109,7 +126,11 @@ func (service *TriggerService) UpdateTrigger(trigger *Trigger) error {
 		return err
 	}
 
-	trigger.expressionRegexp, err = regexp.Compile(trigger.Expression)
+	err = trigger.prepare()
+	if err != nil {
+		return err
+	}
+
 	service.triggers[trigger.Id] = trigger
 	return nil
 }
@@ -155,7 +176,7 @@ func (service *TriggerService) UpdateFromDb() error {
 		}
 
 		t.Headers = getHeadersFromString(headersRow)
-		t.expressionRegexp, err = regexp.Compile(t.Expression)
+		err = t.prepare()
 		if err != nil {
 			return err
 		}
@@ -167,9 +188,7 @@ func (service *TriggerService) UpdateFromDb() error {
 
 func (service *TriggerService) ProcessMessage(message *util.Message) (*util.Message, error) {
 	for _, trigger := range service.triggers {
-		if trigger.IsActive &&
-			containHeaders(message.Headers, trigger.Headers) &&
-			trigger.expressionRegexp.MatchString(message.Body) {
+		if trigger.TriggerOnMessage(message) {
 			log.Debug().Int64("triggerId", trigger.Id).Msg("Выбран триггер")
 			return service.scenarioService.ProcessMessage(message, trigger.Id)
 		}
@@ -187,4 +206,35 @@ func containHeaders(messageHeaders map[string]string, triggerHeaders map[string]
 		}
 	}
 	return true
+}
+
+func (trigger *Trigger) prepare() error {
+	var err error
+	switch trigger.TriggerType {
+	case Regex:
+		trigger.expressionRegexp, err = regexp.Compile(dotAllRegexMod + trigger.Expression)
+		if err != nil {
+			return &TriggerValidationException{message: err.Error()}
+		}
+	case Json:
+		if _, ok := trigger.Headers[contentType]; !ok {
+			trigger.Headers[contentType] = contentTypeJSONValue
+		}
+	}
+	return nil
+}
+
+func (trigger *Trigger) TriggerOnMessage(message *util.Message) bool {
+	if !trigger.IsActive || !containHeaders(message.Headers, trigger.Headers) {
+		return false
+	}
+
+	result := false
+	switch trigger.TriggerType {
+	case Regex:
+		result = trigger.expressionRegexp.MatchString(message.Body)
+	case Json:
+		result = gjson.Get(message.Body, trigger.Expression).Exists()
+	}
+	return result
 }

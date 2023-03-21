@@ -11,9 +11,11 @@ const SelectAllQuery = "SELECT * FROM templates"
 const UpdateQuery = "UPDATE templates SET name = ?, body = ? where id = ?"
 
 type Template struct {
-	Id   int64
-	Name string
-	Body string
+	Id         int64
+	Name       string
+	Body       string
+	extractors []MessageExtractor
+	updaters   []MessageUpdater
 }
 
 func (template *Template) validate() bool {
@@ -43,9 +45,9 @@ func (service *TemplateService) GetTemplates() []*Template {
 }
 
 func (service *TemplateService) GetTemplateById(id int64) (*Template, error) {
-	template := service.templates[id]
+	template, ok := service.templates[id]
 
-	if template == nil {
+	if !ok {
 		return nil, &TemplateNotFoundException{
 			message: fmt.Sprintf("Шаблон с id = %d не найден", id),
 		}
@@ -132,6 +134,7 @@ func (service *TemplateService) ProcessMessage(templateId int64, message *util.M
 }
 
 func (template *Template) ProcessMessage(message *util.Message) *util.Message {
+
 	return &util.Message{
 		Body:    template.Body,
 		Headers: map[string]string{},
