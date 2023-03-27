@@ -44,7 +44,7 @@ func (handler *TriggerHandler) AddTrigger(context *fiber.Ctx) error {
 	if err := handler.triggerService.AddTrigger(trigger); err != nil {
 		return err
 	}
-	return nil
+	return context.JSON(trigger)
 }
 
 func (handler *TriggerHandler) UpdateTrigger(context *fiber.Ctx) error {
@@ -58,6 +58,18 @@ func (handler *TriggerHandler) UpdateTrigger(context *fiber.Ctx) error {
 	}
 	trigger.Id = id
 	if err := handler.triggerService.UpdateTrigger(trigger); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (handler *TriggerHandler) DeleteTrigger(context *fiber.Ctx) error {
+	id, err := strconv.ParseInt(context.Params("id"), 10, 64)
+	if err != nil {
+		return util.CreateParamValidationException("id", err)
+	}
+
+	if err := handler.triggerService.DeleteTrigger(id); err != nil {
 		return err
 	}
 	return nil

@@ -63,6 +63,18 @@ func (handler *TemplateHandler) UpdateTemplate(context *fiber.Ctx) error {
 	return nil
 }
 
+func (handler *TemplateHandler) DeleteTemplate(context *fiber.Ctx) error {
+	id, err := strconv.ParseInt(context.Params("id"), 10, 64)
+	if err != nil {
+		return util.CreateParamValidationException("id", err)
+	}
+
+	if err := handler.templateService.DeleteTemplate(id); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (handler *TemplateHandler) ProcessSpecificTemplate(context *fiber.Ctx) error {
 	templateId, err := strconv.ParseInt(context.Params("id"), 10, 64)
 	if err != nil {

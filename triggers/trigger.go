@@ -14,6 +14,7 @@ import (
 const InsertQuery = "INSERT INTO triggers (type, expression, description, active, headers) VALUES (?,?,?,?,?)"
 const UpdateQuery = "UPDATE triggers SET type = ?, expression = ?, description = ?, active = ?, headers = ? where id = ?"
 const SelectAllQuery = "SELECT * FROM triggers"
+const DeleteQuery = "DELETE FROM triggers WHERE id = ?"
 
 type TriggerType string
 
@@ -27,12 +28,12 @@ const contentTypeJSONValue = "application/json"
 const dotAllRegexMod = "(?s)"
 
 type Trigger struct {
-	Id               int64
-	TriggerType      TriggerType
-	Expression       string
-	Description      string
-	IsActive         bool
-	Headers          map[string]string
+	Id               int64             `json:"id"`
+	TriggerType      TriggerType       `json:"type,omitempty"`
+	Expression       string            `json:"expression,omitempty"`
+	Description      string            `json:"description,omitempty"`
+	IsActive         bool              `json:"is_active,omitempty"`
+	Headers          map[string]string `json:"headers,omitempty"`
 	expressionRegexp *regexp.Regexp
 }
 
@@ -60,7 +61,6 @@ func (service *TriggerService) GetTriggers() []*Trigger {
 	for _, value := range service.triggers {
 		triggerValues = append(triggerValues, value)
 	}
-
 	return triggerValues
 }
 
@@ -132,6 +132,25 @@ func (service *TriggerService) UpdateTrigger(trigger *Trigger) error {
 	}
 
 	service.triggers[trigger.Id] = trigger
+	return nil
+}
+
+func (service *TriggerService) DeleteTrigger(id int64) error {
+	deleteStatement, err := service.db.Prepare(DeleteQuery)
+	if err != nil {
+		return err
+	}
+	_, err = deleteStatement.Exec(id)
+	if err != nil {
+		return err
+	}
+
+	err = deleteStatement.Close()
+	if err != nil {
+		return err
+	}
+
+	delete(service.triggers, id)
 	return nil
 }
 

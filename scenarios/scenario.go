@@ -13,11 +13,11 @@ const InsertQuery = "INSERT INTO scenario_steps (order_number, value, trigger_id
 const UpdateQuery = "UPDATE scenario_steps SET order_number = ?, value = ?, trigger_id = ?, step_type = ? where id = ?"
 
 type ScenarioStep struct {
-	Id          int64
-	OrderNumber int
-	Value       int64
-	TriggerId   int64
-	StepType    ScenarioStepType
+	Id          int64            `json:"id,omitempty"`
+	OrderNumber int              `json:"order_number,omitempty"`
+	Value       int64            `json:"value,omitempty"`
+	TriggerId   int64            `json:"trigger_id,omitempty"`
+	StepType    ScenarioStepType `json:"step_type,omitempty"`
 }
 
 type ScenarioStepType string

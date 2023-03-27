@@ -1,8 +1,10 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
@@ -34,6 +36,8 @@ func main() {
 	dbFile := viper.GetString("db.file")
 	embeddedMonitor := viper.GetBool("monitoring.embedded")
 	prometheusMonitor := viper.GetBool("monitoring.prometheus")
+	viper.SetDefault("server.tls", false)
+	useTLS := viper.GetBool("server.tls")
 	level, err := zerolog.ParseLevel(loggingLevel)
 	if err != nil {
 		level = zerolog.InfoLevel
@@ -68,6 +72,12 @@ func main() {
 	})
 
 	app.Use(Middleware())
+	app.Use(cors.New(cors.Config{
+		AllowHeaders:     "Origin,Content-Type,Accept,Content-Length,Accept-Language,Accept-Encoding,Connection,Access-Control-Allow-Origin",
+		AllowOrigins:     "*",
+		AllowCredentials: true,
+		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+	}))
 
 	templateService := templates.NewService(sqlDB)
 	err = templateService.UpdateFromDb()
@@ -100,6 +110,7 @@ func main() {
 	triggersController.Post("", triggerHandler.AddTrigger)
 	triggersController.Get("/:id", triggerHandler.GetTriggerById)
 	triggersController.Put("/:id", triggerHandler.UpdateTrigger)
+	triggersController.Delete("/:id", triggerHandler.DeleteTrigger)
 
 	templateController := api.Group("/templates")
 	templateController.Get("", templateHandler.GetTemplates)
@@ -107,6 +118,7 @@ func main() {
 	templateController.Get("/:id", templateHandler.GetTemplateById)
 	templateController.All("/:id/process*", templateHandler.ProcessSpecificTemplate)
 	templateController.Put("/:id", templateHandler.UpdateTemplate)
+	templateController.Delete("/:id", templateHandler.DeleteTemplate)
 
 	scenarioController := api.Group("/steps")
 	scenarioController.Get("/field/triggerId/:triggerId", scenarioHandler.GetOrderedStepsByTriggerId)
@@ -127,10 +139,32 @@ func main() {
 		app.Get("/monitor", monitor.New(monitor.Config{Title: "Unimock Metrics Page"}))
 	}
 
-	err = app.Listen(":" + strconv.Itoa(serverPort))
-	if err != nil {
-		log.Error().Err(err).Msg("")
+	if useTLS {
+		cert, err := tls.LoadX509KeyPair(viper.GetString("server.cert_name"), viper.GetString("server.key_name"))
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to load SSL certificate")
+		}
+
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		}
+
+		ln, err := tls.Listen("tcp", ":443", tlsConfig)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to set up server")
+		}
+
+		// Start the server with SSL
+		if err := app.Listener(ln); err != nil {
+			log.Error().Err(err).Msg("Failed to start server")
+		}
+	} else {
+		err = app.Listen(":" + strconv.Itoa(serverPort))
+		if err != nil {
+			log.Error().Err(err).Msg("")
+		}
 	}
+
 }
 
 func Middleware() fiber.Handler {

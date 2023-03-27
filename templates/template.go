@@ -9,11 +9,12 @@ import (
 const InsertQuery = "INSERT INTO templates (name, body) VALUES (?,?)"
 const SelectAllQuery = "SELECT * FROM templates"
 const UpdateQuery = "UPDATE templates SET name = ?, body = ? where id = ?"
+const DeleteQuery = "DELETE FROM templates WHERE id = ?"
 
 type Template struct {
-	Id         int64
-	Name       string
-	Body       string
+	Id         int64  `json:"id"`
+	Name       string `json:"name,omitempty"`
+	Body       string `json:"body,omitempty"`
 	extractors []MessageExtractor
 	updaters   []MessageUpdater
 }
@@ -102,6 +103,25 @@ func (service *TemplateService) UpdateTemplate(template *Template) error {
 	}
 
 	service.templates[template.Id] = template
+	return nil
+}
+
+func (service *TemplateService) DeleteTemplate(id int64) error {
+	deleteStatement, err := service.db.Prepare(DeleteQuery)
+	if err != nil {
+		return err
+	}
+	_, err = deleteStatement.Exec(id)
+	if err != nil {
+		return err
+	}
+
+	err = deleteStatement.Close()
+	if err != nil {
+		return err
+	}
+
+	delete(service.templates, id)
 	return nil
 }
 
