@@ -3,6 +3,7 @@ package scenarios
 import (
 	"database/sql"
 	"sort"
+	"sync"
 	"time"
 	"unimock/templates"
 	"unimock/util"
@@ -13,11 +14,11 @@ const InsertQuery = "INSERT INTO scenario_steps (order_number, value, trigger_id
 const UpdateQuery = "UPDATE scenario_steps SET order_number = ?, value = ?, trigger_id = ?, step_type = ? where id = ?"
 
 type ScenarioStep struct {
-	Id          int64            `json:"id,omitempty"`
-	OrderNumber int              `json:"order_number,omitempty"`
-	Value       int64            `json:"value,omitempty"`
-	TriggerId   int64            `json:"trigger_id,omitempty"`
-	StepType    ScenarioStepType `json:"step_type,omitempty"`
+	Id          int64            `json:"id"`
+	OrderNumber int              `json:"order_number"`
+	Value       int64            `json:"value"`
+	TriggerId   int64            `json:"trigger_id"`
+	StepType    ScenarioStepType `json:"step_type"`
 }
 
 type ScenarioStepType string
@@ -37,6 +38,7 @@ type ScenarioService struct {
 	steps           map[int64]Steps
 	db              *sql.DB
 	templateService *templates.TemplateService
+	mut             sync.RWMutex
 }
 
 func NewService(db *sql.DB, templateService *templates.TemplateService) *ScenarioService {
@@ -67,7 +69,9 @@ func (service *ScenarioService) AddStep(step *ScenarioStep) error {
 		return err
 	}
 
+	service.mut.Lock()
 	service.steps[step.TriggerId] = append(service.steps[step.TriggerId], step)
+	service.mut.Unlock()
 	return nil
 }
 
@@ -86,11 +90,13 @@ func (service *ScenarioService) UpdateStep(step *ScenarioStep) error {
 		return err
 	}
 
+	service.mut.Lock()
 	stepIndex, err := findStepIndexByID(service.steps[step.TriggerId], step.Id)
 	if err != nil {
 		return service.UpdateFromDb()
 	}
 	service.steps[step.TriggerId][stepIndex] = step
+	service.mut.Unlock()
 	return nil
 }
 
@@ -100,6 +106,7 @@ func (service *ScenarioService) UpdateFromDb() error {
 		return err
 	}
 
+	service.mut.Lock()
 	service.steps = make(map[int64]Steps)
 
 	for rows.Next() {
@@ -111,16 +118,23 @@ func (service *ScenarioService) UpdateFromDb() error {
 
 		service.steps[step.TriggerId] = append(service.steps[step.TriggerId], &step)
 	}
+	service.mut.Unlock()
 	return nil
 }
 
 func (service *ScenarioService) GetOrderedStepsByTriggerId(triggerId int64) Steps {
+	service.mut.RLock()
 	steps, ok := service.steps[triggerId]
 	if !ok {
+		service.mut.RUnlock()
 		return Steps{}
 	}
-	sort.Sort(steps)
-	return steps
+	stepsCopy := make(Steps, len(steps))
+	copy(stepsCopy, steps)
+	service.mut.RUnlock()
+
+	sort.Sort(stepsCopy)
+	return stepsCopy
 }
 
 func (service *ScenarioService) ProcessMessage(inputMessage *util.Message, triggerId int64) (*util.Message, error) {

@@ -6,15 +6,16 @@ import (
 	"unimock/util"
 )
 
-const InsertQuery = "INSERT INTO templates (name, body) VALUES (?,?)"
+const InsertQuery = "INSERT INTO templates (name, body, subsystem) VALUES (?,?,?)"
 const SelectAllQuery = "SELECT * FROM templates"
-const UpdateQuery = "UPDATE templates SET name = ?, body = ? where id = ?"
+const UpdateQuery = "UPDATE templates SET name = ?, body = ?, subsystem = ? where id = ?"
 const DeleteQuery = "DELETE FROM templates WHERE id = ?"
 
 type Template struct {
 	Id         int64  `json:"id"`
-	Name       string `json:"name,omitempty"`
-	Body       string `json:"body,omitempty"`
+	Name       string `json:"name"`
+	Body       string `json:"body"`
+	Subsystem  string `json:"subsystem"`
 	extractors []MessageExtractor
 	updaters   []MessageUpdater
 }
@@ -45,6 +46,20 @@ func (service *TemplateService) GetTemplates() []*Template {
 	return templateValues
 }
 
+func (service *TemplateService) GetTemplatesWithoutBody() []Template {
+	templateValues := make([]Template, 0, len(service.templates))
+
+	for _, value := range service.templates {
+		templateValues = append(templateValues, Template{
+			Id:        value.Id,
+			Name:      value.Name,
+			Subsystem: value.Subsystem,
+		})
+	}
+
+	return templateValues
+}
+
 func (service *TemplateService) GetTemplateById(id int64) (*Template, error) {
 	template, ok := service.templates[id]
 
@@ -65,7 +80,7 @@ func (service *TemplateService) AddTemplate(template *Template) error {
 	if err != nil {
 		return err
 	}
-	res, err := insertStatement.Exec(template.Name, template.Body)
+	res, err := insertStatement.Exec(template.Name, template.Body, template.Subsystem)
 	if err != nil {
 		return err
 	}
@@ -92,7 +107,7 @@ func (service *TemplateService) UpdateTemplate(template *Template) error {
 	if err != nil {
 		return err
 	}
-	_, err = updateStatement.Exec(template.Name, template.Body, template.Id)
+	_, err = updateStatement.Exec(template.Name, template.Body, template.Subsystem, template.Id)
 	if err != nil {
 		return err
 	}
@@ -135,7 +150,7 @@ func (service *TemplateService) UpdateFromDb() error {
 
 	for rows.Next() {
 		var t Template
-		err = rows.Scan(&t.Id, &t.Name, &t.Body)
+		err = rows.Scan(&t.Id, &t.Name, &t.Body, &t.Subsystem)
 		if err != nil {
 			return err
 		}

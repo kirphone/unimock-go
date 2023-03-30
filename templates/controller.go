@@ -19,7 +19,16 @@ func NewHandler(service *TemplateService) *TemplateHandler {
 }
 
 func (handler *TemplateHandler) GetTemplates(context *fiber.Ctx) error {
-	return context.JSON(handler.templateService.GetTemplates())
+	includeBody, err := strconv.ParseBool(context.Query("includeBody", "true"))
+	if err != nil {
+		includeBody = true
+	}
+
+	if includeBody {
+		return context.JSON(handler.templateService.GetTemplates())
+	} else {
+		return context.JSON(handler.templateService.GetTemplatesWithoutBody())
+	}
 }
 
 func (handler *TemplateHandler) GetTemplateById(context *fiber.Ctx) error {
@@ -44,7 +53,7 @@ func (handler *TemplateHandler) AddTemplate(context *fiber.Ctx) error {
 	if err := handler.templateService.AddTemplate(template); err != nil {
 		return err
 	}
-	return nil
+	return context.JSON(template)
 }
 
 func (handler *TemplateHandler) UpdateTemplate(context *fiber.Ctx) error {

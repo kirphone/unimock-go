@@ -19,6 +19,7 @@ func NewHandler(service *TriggerService) *TriggerHandler {
 }
 
 func (handler *TriggerHandler) GetTriggers(context *fiber.Ctx) error {
+
 	return context.JSON(handler.triggerService.GetTriggers())
 }
 
@@ -37,10 +38,11 @@ func (handler *TriggerHandler) GetTriggerById(context *fiber.Ctx) error {
 }
 
 func (handler *TriggerHandler) AddTrigger(context *fiber.Ctx) error {
-	trigger := new(Trigger)
-	if err := json.Unmarshal(context.Body(), trigger); err != nil {
+	baseTrigger := new(Trigger)
+	if err := json.Unmarshal(context.Body(), baseTrigger); err != nil {
 		return &TriggerValidationException{message: err.Error()}
 	}
+	trigger := CreateTriggerFromBaseTrigger(baseTrigger)
 	if err := handler.triggerService.AddTrigger(trigger); err != nil {
 		return err
 	}
@@ -48,15 +50,16 @@ func (handler *TriggerHandler) AddTrigger(context *fiber.Ctx) error {
 }
 
 func (handler *TriggerHandler) UpdateTrigger(context *fiber.Ctx) error {
-	trigger := new(Trigger)
-	if err := json.Unmarshal(context.Body(), trigger); err != nil {
+	baseTrigger := new(Trigger)
+	if err := json.Unmarshal(context.Body(), baseTrigger); err != nil {
 		return &TriggerValidationException{message: err.Error()}
 	}
 	id, err := strconv.ParseInt(context.Params("id"), 10, 64)
 	if err != nil {
 		return util.CreateParamValidationException("id", err)
 	}
-	trigger.Id = id
+	trigger := CreateTriggerFromBaseTrigger(baseTrigger)
+	trigger.setId(id)
 	if err := handler.triggerService.UpdateTrigger(trigger); err != nil {
 		return err
 	}

@@ -35,7 +35,7 @@ func (handler *ScenarioHandler) AddStep(context *fiber.Ctx) error {
 	if err := handler.scenarioService.AddStep(step); err != nil {
 		return err
 	}
-	return nil
+	return context.JSON(step)
 }
 
 func (handler *ScenarioHandler) UpdateStep(context *fiber.Ctx) error {
