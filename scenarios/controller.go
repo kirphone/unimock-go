@@ -53,3 +53,20 @@ func (handler *ScenarioHandler) UpdateStep(context *fiber.Ctx) error {
 	}
 	return nil
 }
+
+func (handler *ScenarioHandler) UpdateStepsForTrigger(context *fiber.Ctx) error {
+	steps := make(Steps, 0)
+	if err := json.Unmarshal(context.Body(), &steps); err != nil {
+		return &StepValidationException{message: err.Error()}
+	}
+	triggerId, err := strconv.ParseInt(context.Params("triggerId"), 10, 64)
+	if err != nil {
+		return util.CreateParamValidationException("triggerId", err)
+	}
+
+	steps, err = handler.scenarioService.UpdateStepsForTrigger(steps, triggerId)
+	if err != nil {
+		return err
+	}
+	return context.JSON(steps)
+}

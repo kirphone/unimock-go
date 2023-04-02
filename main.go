@@ -125,6 +125,7 @@ func main() {
 	scenarioController.Get("/field/triggerId/:triggerId", scenarioHandler.GetOrderedStepsByTriggerId)
 	scenarioController.Post("", scenarioHandler.AddStep)
 	scenarioController.Put("/:id", scenarioHandler.UpdateStep)
+	scenarioController.Put("/field/triggerId/:triggerId", scenarioHandler.UpdateStepsForTrigger)
 
 	api.All("/http/process*", triggerHandler.ProcessMessage)
 

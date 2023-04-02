@@ -10,6 +10,7 @@ import (
 )
 
 const SelectAllQuery = "SELECT * FROM scenario_steps"
+const SelectByTriggerIdQuery = "SELECT * FROM scenario_steps where trigger_id = ?"
 const InsertQuery = "INSERT INTO scenario_steps (order_number, value, trigger_id, step_type) VALUES (?,?,?,?)"
 const UpdateQuery = "UPDATE scenario_steps SET order_number = ?, value = ?, trigger_id = ?, step_type = ? where id = ?"
 
@@ -54,17 +55,14 @@ func (service *ScenarioService) AddStep(step *ScenarioStep) error {
 	if err != nil {
 		return err
 	}
+
+	defer insertStatement.Close()
 	res, err := insertStatement.Exec(step.OrderNumber, step.Value, step.TriggerId, step.StepType)
 	if err != nil {
 		return err
 	}
 
 	step.Id, err = res.LastInsertId()
-	if err != nil {
-		return err
-	}
-
-	err = insertStatement.Close()
 	if err != nil {
 		return err
 	}
@@ -80,12 +78,8 @@ func (service *ScenarioService) UpdateStep(step *ScenarioStep) error {
 	if err != nil {
 		return err
 	}
+	defer updateStatement.Close()
 	_, err = updateStatement.Exec(step.OrderNumber, step.Value, step.TriggerId, step.StepType, step.Id)
-	if err != nil {
-		return err
-	}
-
-	err = updateStatement.Close()
 	if err != nil {
 		return err
 	}
@@ -100,6 +94,53 @@ func (service *ScenarioService) UpdateStep(step *ScenarioStep) error {
 	return nil
 }
 
+func (service *ScenarioService) UpdateStepsForTrigger(steps Steps, triggerId int64) (Steps, error) {
+	tx, err := service.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	updateStatement, err := service.db.Prepare(UpdateQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	defer updateStatement.Close()
+
+	insertStatement, err := service.db.Prepare(InsertQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	defer insertStatement.Close()
+
+	for i, _ := range steps {
+		if steps[i].Id == -1 {
+			_, err := insertStatement.Exec(steps[i].OrderNumber, steps[i].Value, steps[i].TriggerId, steps[i].StepType)
+			if err != nil {
+				_ = tx.Rollback()
+				return nil, err
+			}
+		} else {
+			_, err = updateStatement.Exec(steps[i].OrderNumber, steps[i].Value, steps[i].TriggerId, steps[i].StepType, steps[i].Id)
+			if err != nil {
+				_ = tx.Rollback()
+				return nil, err
+			}
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := service.updateStepsForTriggerFromDb(triggerId); err != nil {
+		return nil, err
+	}
+
+	return service.GetOrderedStepsByTriggerId(triggerId), nil
+}
+
 func (service *ScenarioService) UpdateFromDb() error {
 	rows, err := service.db.Query(SelectAllQuery)
 	if err != nil {
@@ -108,6 +149,28 @@ func (service *ScenarioService) UpdateFromDb() error {
 
 	service.mut.Lock()
 	service.steps = make(map[int64]Steps)
+
+	for rows.Next() {
+		var step ScenarioStep
+		err = rows.Scan(&step.Id, &step.OrderNumber, &step.Value, &step.TriggerId, &step.StepType)
+		if err != nil {
+			return err
+		}
+
+		service.steps[step.TriggerId] = append(service.steps[step.TriggerId], &step)
+	}
+	service.mut.Unlock()
+	return nil
+}
+
+func (service *ScenarioService) updateStepsForTriggerFromDb(triggerId int64) error {
+	rows, err := service.db.Query(SelectByTriggerIdQuery, triggerId)
+	if err != nil {
+		return err
+	}
+
+	service.mut.Lock()
+	service.steps[triggerId] = make(Steps, 0)
 
 	for rows.Next() {
 		var step ScenarioStep
