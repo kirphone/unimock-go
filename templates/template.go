@@ -14,7 +14,7 @@ const SelectAllQuery = "SELECT * FROM templates"
 const UpdateQuery = "UPDATE templates SET name = ?, body = ?, subsystem = ? where id = ?"
 const DeleteQuery = "DELETE FROM templates WHERE id = ?"
 
-var variableRegexp = regexp.MustCompile(`\$\{\d+\}`)
+var variableRegexp = regexp.MustCompile(`\$\{\d+}`)
 
 type Template struct {
 	Id         int64  `json:"id"`

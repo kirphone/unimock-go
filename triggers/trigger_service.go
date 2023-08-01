@@ -3,8 +3,12 @@ package triggers
 import (
 	"database/sql"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
+	"strconv"
 	"strings"
+	"time"
 	"unimock/scenarios"
 	"unimock/util"
 )
@@ -13,6 +17,12 @@ const InsertQuery = "INSERT INTO triggers (type, expression, description, active
 const UpdateQuery = "UPDATE triggers SET type = ?, expression = ?, description = ?, active = ?, headers = ?, subsystem = ? where id = ?"
 const SelectAllQuery = "SELECT * FROM triggers"
 const DeleteQuery = "DELETE FROM triggers WHERE id = ?"
+
+var successTriggerProcessingMetric = promauto.NewHistogramVec(prometheus.HistogramOpts{Name: "trigger_success_requests_duration_histogram", Help: "Успешные обработки запросов триггером"},
+	[]string{"trigger_id"})
+
+var failedTriggerProcessingMetric = promauto.NewHistogramVec(prometheus.HistogramOpts{Name: "trigger_failed_requests_duration_histogram", Help: "Неспешные обработки запросов триггером"},
+	[]string{"trigger_id"})
 
 type TriggerService struct {
 	triggers        map[int64]TriggerInterface
@@ -188,7 +198,17 @@ func (service *TriggerService) ProcessMessage(message *util.Message) (*util.Mess
 	for _, trigger := range service.triggers {
 		if trigger.TriggerOnMessage(message) {
 			log.Debug().Int64("triggerId", trigger.getId()).Msg("Выбран триггер")
-			return service.scenarioService.ProcessMessage(message, trigger.getId())
+			startTime := time.Now()
+			msg, err := service.scenarioService.ProcessMessage(message, trigger.getId())
+			duration := time.Since(startTime).Seconds()
+			if err == nil {
+				successTriggerProcessingMetric.WithLabelValues(strconv.FormatInt(trigger.getId(), 10)).
+					Observe(duration)
+			} else {
+				failedTriggerProcessingMetric.WithLabelValues(strconv.FormatInt(trigger.getId(), 10)).
+					Observe(duration)
+			}
+			return msg, err
 		}
 	}
 	return nil, &TriggerNotFoundException{
