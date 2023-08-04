@@ -39,3 +39,8 @@ create table if not exists scenario_steps
 create unique index if not exists Triggers_expression_header
     on triggers (expression, headers);
 
+create table if not exists version
+(
+    version INTEGER not null
+);
+INSERT INTO version (version) VALUES (0);
