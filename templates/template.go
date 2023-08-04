@@ -174,7 +174,7 @@ func (service *TemplateService) ProcessMessage(templateId int64, message *util.M
 
 func (template *Template) ProcessMessage(message *util.Message) *util.Message {
 
-	resultBody := variableRegexp.ReplaceAllStringFunc(message.Body, func(match string) string {
+	resultBody := variableRegexp.ReplaceAllStringFunc(template.Body, func(match string) string {
 		idStr := strings.TrimSuffix(strings.TrimPrefix(match, "${"), "}")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {

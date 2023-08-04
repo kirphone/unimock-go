@@ -3,6 +3,7 @@ package triggers
 import (
 	"github.com/tidwall/gjson"
 	"regexp"
+	"strings"
 	"unimock/util"
 )
 
@@ -135,7 +136,26 @@ func (trigger *JsonGsonTrigger) prepare() error {
 func containHeaders(messageHeaders map[string]string, triggerHeaders map[string]string) bool {
 	for key, valueTrigger := range triggerHeaders {
 		valueMessage, ok := messageHeaders[key]
-		if !ok || valueMessage != valueTrigger {
+		if !ok {
+			return false
+		}
+
+		splitValueMessage := strings.Split(valueMessage, ";")
+
+		// Trim any whitespace
+		for i, val := range splitValueMessage {
+			splitValueMessage[i] = strings.TrimSpace(val)
+		}
+
+		contains := false
+		for _, val := range splitValueMessage {
+			if valueTrigger == val {
+				contains = true
+				break
+			}
+		}
+
+		if !contains {
 			return false
 		}
 	}
