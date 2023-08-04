@@ -34,6 +34,7 @@ func main() {
 	loggingLevel := viper.GetString("logging.level")
 	logFile := viper.GetString("logging.file")
 	dbFile := viper.GetString("db.file")
+	sqlHistoryDirectory := viper.GetString("db.sql_history.directory")
 	embeddedMonitor := viper.GetBool("monitoring.embedded")
 	prometheusMonitor := viper.GetBool("monitoring.prometheus")
 	viper.SetDefault("server.tls", false)
@@ -57,14 +58,12 @@ func main() {
 	log.Logger = log.Output(zerolog.MultiLevelWriter(os.Stdout, fileLogger))
 
 	log.Info().Msgf("Log level is %s", level.String())
-	sqlDB, err := database.InitDatabaseConnection(dbFile)
+	sqlDB, err := database.InitDatabaseConnection(dbFile, sqlHistoryDirectory)
 
 	if err != nil {
 		log.Error().Err(err).Msg("При соединении с базой данных произошла ошибка")
 		return
 	}
-
-	log.Info().Msg("Соединение с базой данных успешно установлено")
 
 	app := fiber.New(fiber.Config{
 		BodyLimit:    50 * 1024 * 1024,

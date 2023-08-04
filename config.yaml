@@ -6,6 +6,8 @@ logging:
   file: server.log
 db:
   file: database/unimock.db
+  sql_history:
+    directory: ./sql
 monitoring:
    embedded: true
    prometheus: true

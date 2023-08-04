@@ -1,4 +1,4 @@
-create table templates
+create table if not exists templates
 (
     id        INTEGER not null
         primary key autoincrement,
