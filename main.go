@@ -3,6 +3,15 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"os"
+	"strconv"
+	"time"
+	"unimock/database"
+	"unimock/errorhandlers"
+	"unimock/scenarios"
+	"unimock/templates"
+	"unimock/triggers"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/monitor"
@@ -12,14 +21,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"os"
-	"strconv"
-	"time"
-	"unimock/database"
-	"unimock/errorhandlers"
-	"unimock/scenarios"
-	"unimock/templates"
-	"unimock/triggers"
 )
 
 func main() {
@@ -71,7 +72,6 @@ func main() {
 	})
 
 	app.Static("/", "./public")
-	app.Use(Middleware())
 	app.Use(cors.New(cors.Config{
 		AllowHeaders:     "Origin,Content-Type,Accept,Content-Length,Accept-Language,Accept-Encoding,Connection,Access-Control-Allow-Origin",
 		AllowOrigins:     "*",
@@ -105,6 +105,7 @@ func main() {
 	scenarioHandler := scenarios.NewHandler(scenarioService)
 
 	api := app.Group("/api")
+	api.Use(Middleware())
 	triggersController := api.Group("/triggers")
 	triggersController.Get("", triggerHandler.GetTriggers)
 	triggersController.Post("", triggerHandler.AddTrigger)
@@ -173,10 +174,6 @@ func Middleware() fiber.Handler {
 		start := time.Now()
 
 		err := c.Next()
-
-		if c.Path() == "/monitor" || c.Path() == "/metrics" || c.Path() == "/favicon.ico" {
-			return err
-		}
 
 		if err != nil {
 			err = errorhandlers.HandleError(c, err)

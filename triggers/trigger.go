@@ -1,6 +1,10 @@
 package triggers
 
 import (
+	"context"
+	"encoding/json"
+	"github.com/PaesslerAG/gval"
+	"github.com/PaesslerAG/jsonpath"
 	"github.com/tidwall/gjson"
 	"regexp"
 	"strings"
@@ -10,8 +14,9 @@ import (
 type TriggerType string
 
 const (
-	Json  TriggerType = "json"
-	Regex TriggerType = "regex"
+	Gson     TriggerType = "gson"
+	JsonPath TriggerType = "jsonpath"
+	Regex    TriggerType = "regex"
 )
 
 const contentType = "Content-Type"
@@ -113,8 +118,13 @@ type RegexTrigger struct {
 	expressionRegexp *regexp.Regexp
 }
 
-type JsonGsonTrigger struct {
+type GsonTrigger struct {
 	*Trigger
+}
+
+type JsonPathTrigger struct {
+	*Trigger
+	eval gval.Evaluable
 }
 
 func (trigger *RegexTrigger) prepare() error {
@@ -126,9 +136,22 @@ func (trigger *RegexTrigger) prepare() error {
 	return nil
 }
 
-func (trigger *JsonGsonTrigger) prepare() error {
+func (trigger *GsonTrigger) prepare() error {
 	if _, ok := trigger.Headers[contentType]; !ok {
 		trigger.Headers[contentType] = contentTypeJSONValue
+	}
+	return nil
+}
+
+func (trigger *JsonPathTrigger) prepare() error {
+	if _, ok := trigger.Headers[contentType]; !ok {
+		trigger.Headers[contentType] = contentTypeJSONValue
+	}
+
+	var err error
+	trigger.eval, err = jsonpath.New(trigger.Expression)
+	if err != nil {
+		return &TriggerValidationException{message: err.Error()}
 	}
 	return nil
 }
@@ -174,7 +197,7 @@ func (trigger *RegexTrigger) TriggerOnMessage(message *util.Message) bool {
 	return trigger.expressionRegexp.MatchString(message.Body)
 }
 
-func (trigger *JsonGsonTrigger) TriggerOnMessage(message *util.Message) bool {
+func (trigger *GsonTrigger) TriggerOnMessage(message *util.Message) bool {
 	if !trigger.Trigger.TriggerOnMessage(message) {
 		return false
 	}
@@ -182,12 +205,32 @@ func (trigger *JsonGsonTrigger) TriggerOnMessage(message *util.Message) bool {
 	return gjson.Get(message.Body, trigger.Expression).Exists()
 }
 
+func (trigger *JsonPathTrigger) TriggerOnMessage(message *util.Message) bool {
+	if !trigger.Trigger.TriggerOnMessage(message) {
+		return false
+	}
+
+	messageBody := interface{}(nil)
+	err := json.Unmarshal([]byte(message.Body), &messageBody)
+	if err != nil {
+		return false
+	}
+
+	_, err = trigger.eval(context.Background(), messageBody)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 func CreateTriggerFromBaseTrigger(baseTrigger *Trigger) (trigger TriggerInterface) {
 	switch baseTrigger.TriggerType {
 	case Regex:
 		trigger = &RegexTrigger{Trigger: baseTrigger}
-	case Json:
-		trigger = &JsonGsonTrigger{Trigger: baseTrigger}
+	case Gson:
+		trigger = &GsonTrigger{Trigger: baseTrigger}
+	case JsonPath:
+		trigger = &JsonPathTrigger{Trigger: baseTrigger}
 	}
 	return trigger
 }

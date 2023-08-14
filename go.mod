@@ -3,6 +3,7 @@ module unimock
 go 1.19
 
 require (
+	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/gofiber/fiber/v2 v2.42.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/zerolog v1.29.0
@@ -15,6 +16,7 @@ require (
 )
 
 require (
+	github.com/PaesslerAG/gval v1.0.0 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
