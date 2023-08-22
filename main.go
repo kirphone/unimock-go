@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
@@ -31,35 +32,12 @@ func main() {
 		return
 	}
 
-	serverPort := viper.GetInt("server.port")
-	loggingLevel := viper.GetString("logging.level")
-	logFile := viper.GetString("logging.file")
-	dbFile := viper.GetString("db.file")
-	sqlHistoryDirectory := viper.GetString("db.sql_history.directory")
 	embeddedMonitor := viper.GetBool("monitoring.embedded")
 	prometheusMonitor := viper.GetBool("monitoring.prometheus")
-	viper.SetDefault("server.tls", false)
-	useTLS := viper.GetBool("server.tls")
-	level, err := zerolog.ParseLevel(loggingLevel)
-	if err != nil {
-		level = zerolog.InfoLevel
-	}
 
-	fileLogger := &lumberjack.Logger{
-		Filename:   logFile,
-		MaxSize:    5,
-		MaxBackups: 10,
-		MaxAge:     14,
-		Compress:   true,
-	}
+	setupLogger()
 
-	zerolog.SetGlobalLevel(level)
-
-	zerolog.TimeFieldFormat = "2006-01-02 15:04:05.000"
-	log.Logger = log.Output(zerolog.MultiLevelWriter(os.Stdout, fileLogger))
-
-	log.Info().Msgf("Log level is %s", level.String())
-	sqlDB, err := database.InitDatabaseConnection(dbFile, sqlHistoryDirectory)
+	sqlDB, err := initDatabase()
 
 	if err != nil {
 		log.Error().Err(err).Msg("При соединении с базой данных произошла ошибка")
@@ -141,6 +119,42 @@ func main() {
 		app.Get("/monitor", monitor.New(monitor.Config{Title: "Unimock Metrics Page"}))
 	}
 
+	startServer(app)
+}
+
+func setupLogger() {
+	loggingLevel := viper.GetString("logging.level")
+	logFile := viper.GetString("logging.file")
+	level, err := zerolog.ParseLevel(loggingLevel)
+	if err != nil {
+		level = zerolog.InfoLevel
+	}
+
+	fileLogger := &lumberjack.Logger{
+		Filename:   logFile,
+		MaxSize:    5,
+		MaxBackups: 10,
+		MaxAge:     14,
+		Compress:   true,
+	}
+
+	zerolog.SetGlobalLevel(level)
+	zerolog.TimeFieldFormat = "2006-01-02 15:04:05.000"
+	log.Logger = log.Output(zerolog.MultiLevelWriter(os.Stdout, fileLogger))
+	log.Info().Msgf("Log level is %s", level.String())
+}
+
+func initDatabase() (*sql.DB, error) {
+	dbFile := viper.GetString("db.file")
+	sqlHistoryDirectory := viper.GetString("db.sql_history.directory")
+	return database.InitDatabaseConnection(dbFile, sqlHistoryDirectory)
+}
+
+func startServer(app *fiber.App) {
+	viper.SetDefault("server.tls", false)
+	useTLS := viper.GetBool("server.tls")
+	serverPort := viper.GetInt("server.port")
+
 	if useTLS {
 		cert, err := tls.LoadX509KeyPair(viper.GetString("server.cert_name"), viper.GetString("server.key_name"))
 		if err != nil {
@@ -161,12 +175,11 @@ func main() {
 			log.Error().Err(err).Msg("Failed to start server")
 		}
 	} else {
-		err = app.Listen(":" + strconv.Itoa(serverPort))
+		err := app.Listen(":" + strconv.Itoa(serverPort))
 		if err != nil {
 			log.Error().Err(err).Msg("")
 		}
 	}
-
 }
 
 func Middleware() fiber.Handler {

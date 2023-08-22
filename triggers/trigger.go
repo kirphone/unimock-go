@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/PaesslerAG/gval"
 	"github.com/PaesslerAG/jsonpath"
+	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
 	"regexp"
 	"strings"
@@ -210,17 +211,21 @@ func (trigger *JsonPathTrigger) TriggerOnMessage(message *util.Message) bool {
 		return false
 	}
 
-	messageBody := interface{}(nil)
+	var messageBody interface{}
 	err := json.Unmarshal([]byte(message.Body), &messageBody)
+	if err != nil {
+		log.Error().Err(err).Msg("Error unmarshalling message body into json")
+		return false
+	}
+
+	result, err := trigger.eval(context.Background(), messageBody)
 	if err != nil {
 		return false
 	}
 
-	_, err = trigger.eval(context.Background(), messageBody)
-	if err != nil {
-		return false
-	}
-	return true
+	resultBool, ok := result.(bool)
+
+	return ok && resultBool
 }
 
 func CreateTriggerFromBaseTrigger(baseTrigger *Trigger) (trigger TriggerInterface) {
