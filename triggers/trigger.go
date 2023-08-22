@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"github.com/PaesslerAG/gval"
 	"github.com/PaesslerAG/jsonpath"
+	"github.com/antchfx/xmlquery"
+	"github.com/antchfx/xpath"
 	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
 	"regexp"
@@ -18,10 +20,13 @@ const (
 	Gson     TriggerType = "gson"
 	JsonPath TriggerType = "jsonpath"
 	Regex    TriggerType = "regex"
+	XPath    TriggerType = "xpath"
 )
 
 const contentType = "Content-Type"
 const contentTypeJSONValue = "application/json"
+
+const contentTypeXMLValue = "application/xml"
 const dotAllRegexMod = "(?s)"
 
 type TriggerInterface interface {
@@ -128,6 +133,11 @@ type JsonPathTrigger struct {
 	eval gval.Evaluable
 }
 
+type XmlPathTrigger struct {
+	*Trigger
+	expression *xpath.Expr
+}
+
 func (trigger *RegexTrigger) prepare() error {
 	var err error
 	trigger.expressionRegexp, err = regexp.Compile(dotAllRegexMod + trigger.Expression)
@@ -151,6 +161,19 @@ func (trigger *JsonPathTrigger) prepare() error {
 
 	var err error
 	trigger.eval, err = jsonpath.New(trigger.Expression)
+	if err != nil {
+		return &TriggerValidationException{message: err.Error()}
+	}
+	return nil
+}
+
+func (trigger *XmlPathTrigger) prepare() error {
+	if _, ok := trigger.Headers[contentType]; !ok {
+		trigger.Headers[contentType] = contentTypeXMLValue
+	}
+
+	var err error
+	trigger.expression, err = xpath.Compile(trigger.Expression)
 	if err != nil {
 		return &TriggerValidationException{message: err.Error()}
 	}
@@ -228,6 +251,24 @@ func (trigger *JsonPathTrigger) TriggerOnMessage(message *util.Message) bool {
 	return ok && resultBool
 }
 
+func (trigger *XmlPathTrigger) TriggerOnMessage(message *util.Message) bool {
+	if !trigger.Trigger.TriggerOnMessage(message) {
+		return false
+	}
+
+	messageBody, err := xmlquery.Parse(strings.NewReader(message.Body))
+	if err != nil {
+		log.Error().Err(err).Msg("Error unmarshalling message body into xml")
+		return false
+	}
+
+	if node := xmlquery.QuerySelector(messageBody, trigger.expression); node != nil {
+		return true
+	}
+
+	return false
+}
+
 func CreateTriggerFromBaseTrigger(baseTrigger *Trigger) (trigger TriggerInterface) {
 	switch baseTrigger.TriggerType {
 	case Regex:
@@ -236,6 +277,8 @@ func CreateTriggerFromBaseTrigger(baseTrigger *Trigger) (trigger TriggerInterfac
 		trigger = &GsonTrigger{Trigger: baseTrigger}
 	case JsonPath:
 		trigger = &JsonPathTrigger{Trigger: baseTrigger}
+	case XPath:
+		trigger = &XmlPathTrigger{Trigger: baseTrigger}
 	}
 	return trigger
 }
